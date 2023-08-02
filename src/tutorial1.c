@@ -1,5 +1,6 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
 // #include <libswscale/swscale.h>
 
 #include <stdio.h>
@@ -15,6 +16,13 @@ void exit_if(bool cond, const char* message) {
     fprintf(stderr, message);
     exit(1);
   }
+}
+
+
+//TODO: this
+void decode(AVCodecContext* dec_ctx, AVFrame* frame, AVPacket* pkt, const char* filename) {
+  printf("Decoding\n");
+  return;
 }
 
 int main(int argc, char* argv[]) {
@@ -65,6 +73,7 @@ int main(int argc, char* argv[]) {
   video = p_format_ctx->streams[video_stream_ind];
   exit_if(video_stream_ind == -1, "Didn't find video stream.\n");
  
+  p_codec_ctx = avcodec_alloc_context3(NULL);
   exit_if(avcodec_parameters_to_context(p_codec_ctx, video->codecpar) < 0,
     "Unable to convert to codec context.\n");
   
@@ -74,9 +83,38 @@ int main(int argc, char* argv[]) {
   p_parser = av_parser_init(p_codec->id);
   exit_if(p_parser == NULL, "Unable to initialize parser.\n");
 
-  // TODO: open file and do stuff...
+  exit_if(avcodec_open2(p_codec_ctx, p_codec, NULL) > 0, "Unable to open codec.\n");
+  p_file = fopen(argv[0], "rb");
+  exit_if(p_file == NULL, "Couldn't open the given file.\n");
+
+  p_frame = av_frame_alloc();
+  exit_if(p_frame == NULL, "Couldn't alloc frame.\n");
+
+  do {
+    data_size = fread(inbuf, 1, INBUF_SIZE, p_file);
+    if (ferror(p_file)) break;
+    eof = !data_size;
+
+    p_data = inbuf;
+    int read_size = 0;
+    while (data_size > 0 || eof) {
+      read_size = av_parser_parse2(p_parser, p_codec_ctx, &p_pkt->data, &p_pkt->size, 
+                         p_data, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+      exit_if(read_size < 0, "Error while parsing the video file.\n");
+      p_data += read_size;
+      data_size -= read_size;
+      if (p_pkt->size) decode(p_codec_ctx, p_frame, p_pkt, "MyMov");
+      else if (eof) break;
+    }
+    
+  } while (!eof);
   
-  
+  decode(p_codec_ctx, p_frame, NULL, "MyMov");
+  fclose(p_file);
+  av_parser_close(p_parser);
+  avcodec_free_context(&p_codec_ctx);
+  av_frame_free(&p_frame);
+  av_packet_free(&p_pkt);
   
   printf("Finished program.\n");
   return 0;
