@@ -1,1 +1,1 @@
-Following along an old FFMPEG tutorial to try and learn C video editing.
+Creating a modal video editor in C... for fun?
